@@ -26,4 +26,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Documentation files
+BACKEND_SHOWCASE.md
+BUSINESS_BACKEND_LOGIC_GUIDE.md
+DATABASE_ARCHITECTURE.md
+DEMO_SCRIPT.md
+ERROR_HANDLING_SHOWCASE.md
+WARP.md
 .WARP.md
