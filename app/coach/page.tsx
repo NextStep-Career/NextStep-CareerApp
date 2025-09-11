@@ -13,6 +13,7 @@ import { sanitizeInput, escapeHtml } from "@/lib/sanitize"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { api } from "@/lib/api-client"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 interface Message {
   id: number
@@ -246,7 +247,14 @@ function CoachContent() {
                               message.sender === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                             }`}
                           >
-                            <p className="text-sm leading-relaxed">{message.content}</p>
+                            {message.sender === "ai" ? (
+                              <MarkdownRenderer 
+                                content={message.content} 
+                                className="text-sm [&>*]:text-current"
+                              />
+                            ) : (
+                              <p className="text-sm leading-relaxed">{message.content}</p>
+                            )}
                             {isClient && (
                               <p className="text-xs opacity-70 mt-1">
                                 {message.timestamp.toLocaleTimeString([], {
@@ -288,8 +296,8 @@ function CoachContent() {
 
                 {/* Input */}
                 <div className="space-y-2 mt-4">
-                  <div className="flex space-x-2">
-                    <div className="flex-1 relative">
+                  <div className="flex-1">
+                    <div className="flex space-x-2">
                       <Input
                         value={inputValue}
                         onChange={(e) => {
@@ -301,31 +309,40 @@ function CoachContent() {
                         disabled={isLoading}
                         aria-invalid={!!inputError}
                         maxLength={500}
+                        className="flex-1"
                       />
-                      <span className={`absolute right-3 top-3 text-xs ${
-                        inputValue.length > 450 ? "text-destructive" : "text-muted-foreground"
-                      }`}>
-                        {inputValue.length}/500
-                      </span>
+                      <Button 
+                        onClick={handleSendMessage} 
+                        disabled={isLoading || !inputValue.trim()}
+                        size="icon"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={handleSendMessage} 
-                      disabled={isLoading || !inputValue.trim()}
-                      size="icon"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4" />
-                      )}
-                    </Button>
                   </div>
-                  {inputError && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      {inputError}
-                    </p>
-                  )}
+                  <div className="flex justify-between items-center">
+                    {inputError ? (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {inputError}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Press Enter to send
+                      </p>
+                    )}
+                    <span className={`text-xs ${
+                      inputValue.length > 450 ? "text-warning" : 
+                      inputValue.length === 500 ? "text-destructive" : 
+                      "text-muted-foreground"
+                    }`}>
+                      {inputValue.length}/500 characters
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

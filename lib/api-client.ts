@@ -99,5 +99,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ query }),
       }),
+    
+    resolveApplyUrl: async (data: {
+      title: string
+      company: string
+      sourceUrl: string
+    }) => 
+      apiRequest('/api/jobs/resolve-apply', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 }

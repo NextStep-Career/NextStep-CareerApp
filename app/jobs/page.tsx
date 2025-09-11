@@ -41,6 +41,7 @@ function JobsContent() {
   const [careerData, setCareerData] = useState<any>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [fallbackSuggestions, setFallbackSuggestions] = useState<any[]>([])
+  const [portalLinks, setPortalLinks] = useState<any[]>([])
 
   // Fetch career data to get job search prompts
   useEffect(() => {
@@ -89,6 +90,11 @@ function JobsContent() {
         setJobListings(response.jobs || [])
         setError(null)
         setFallbackSuggestions([])
+      }
+      
+      // Always set portal links if available
+      if (response.portalLinks) {
+        setPortalLinks(response.portalLinks)
       }
     } catch (error: any) {
       console.error('Job search failed:', error)
@@ -225,11 +231,13 @@ function JobsContent() {
         )}
 
         {!loading && jobListings.length > 0 && (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Found {jobListings.length} job opportunities
-            </p>
-            {jobListings.map((job, index) => (
+          <div className="space-y-6">
+            <div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Found {jobListings.length} job opportunities
+              </p>
+              <div className="space-y-4">
+                {jobListings.map((job, index) => (
               <Card key={index} className="hover:border-primary/20 transition-colors">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -260,16 +268,64 @@ function JobsContent() {
                         {job.salary && <Badge variant="outline">{job.salary}</Badge>}
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={job.url || job.link} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        View Job
-                      </a>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        try {
+                          // Try to resolve the apply URL
+                          const response = await api.jobs.resolveApplyUrl({
+                            title: job.title,
+                            company: job.company || '',
+                            sourceUrl: job.url || job.link || job.sourceUrl || ''
+                          })
+                          
+                          if (response.resolvedUrl) {
+                            window.open(response.resolvedUrl, '_blank', 'noopener,noreferrer')
+                          } else {
+                            // Fallback to original URL
+                            window.open(job.url || job.link, '_blank', 'noopener,noreferrer')
+                          }
+                        } catch (error) {
+                          console.error('Failed to resolve job URL:', error)
+                          // Fallback to original URL on error
+                          window.open(job.url || job.link, '_blank', 'noopener,noreferrer')
+                        }
+                      }}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Job
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ))}
+              </div>
+            </div>
+            
+            {/* Portal Links Section */}
+            {portalLinks.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="text-lg">Explore More Opportunities</CardTitle>
+                  <CardDescription>
+                    Check out these popular job portals for more {searchQuery} positions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {portalLinks.map((portal: any, index: number) => (
+                      <Button key={index} variant="outline" size="sm" asChild>
+                        <a href={portal.url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          {portal.name}
+                        </a>
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

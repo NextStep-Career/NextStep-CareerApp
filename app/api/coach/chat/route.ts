@@ -119,11 +119,11 @@ Keep responses concise (under 300 words) and actionable. Be supportive and motiv
     const perplexityResponse = await fetch(PERPLEXITY_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Authorization': `Bearer ${process.env.PPLX_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
+        model: 'sonar',
         messages: [
           { role: 'system', content: systemPrompt },
           ...recentMessages,
