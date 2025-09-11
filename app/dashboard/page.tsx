@@ -24,6 +24,7 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { ProtectedRoute } from "@/components/auth/protected-route"
 import { api } from "@/lib/api-client"
+import { calculateUserStreak } from "@/lib/streak-tracker"
 
 // We'll generate recent activity based on actual user data in the component
 
@@ -113,7 +114,59 @@ function DashboardContent() {
     totalTasks: 0,
     completedTasks: 0,
     overallProgress: 0,
+    streak: 0,
   }
+
+  // Calculate user streak using utility function with error handling
+  const calculateSafeUserStreak = () => {
+    try {
+      // Log for debugging
+      console.log('Debug - userProfile:', userProfile)
+      console.log('Debug - userProfile.createdAt:', userProfile?.createdAt)
+      console.log('Debug - hasCompletedQuiz:', hasCompletedQuiz)
+      console.log('Debug - stats.completedTasks:', stats.completedTasks)
+      
+      if (!userProfile?.createdAt) {
+        console.log('Debug - No createdAt, returning 0')
+        return 0
+      }
+      
+      // Handle different date formats
+      let createdDate
+      if (userProfile.createdAt.toDate) {
+        // Firestore Timestamp
+        createdDate = userProfile.createdAt.toDate()
+      } else if (userProfile.createdAt.seconds) {
+        // Firestore Timestamp object with seconds
+        createdDate = new Date(userProfile.createdAt.seconds * 1000)
+      } else {
+        // Regular date string or Date object
+        createdDate = new Date(userProfile.createdAt)
+      }
+      
+      console.log('Debug - Parsed createdDate:', createdDate)
+      
+      if (isNaN(createdDate.getTime())) {
+        console.error('Debug - Invalid date, returning 0')
+        return 0
+      }
+      
+      const streak = calculateUserStreak(
+        createdDate,
+        hasCompletedQuiz, 
+        stats.completedTasks
+      )
+      
+      console.log('Debug - Calculated streak:', streak)
+      return streak
+      
+    } catch (error) {
+      console.error('Error calculating user streak:', error)
+      return 0
+    }
+  }
+  
+  const userStreak = calculateSafeUserStreak()
 
   // Map career data to display format
   const careerIcons = {
@@ -224,7 +277,9 @@ function DashboardContent() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Streak</p>
-                      <p className="text-2xl font-bold">7 days</p>
+                      <p className="text-2xl font-bold">
+                        {isNaN(userStreak) || userStreak === undefined ? '0' : userStreak} {(userStreak === 1) ? 'day' : 'days'}
+                      </p>
                     </div>
                     <TrendingUp className="w-8 h-8 text-primary" />
                   </div>

@@ -24,6 +24,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { ProtectedRoute } from "@/components/auth/protected-route"
+import { calculateUserStreak } from "@/lib/streak-tracker"
 
 export default function ProfilePage() {
   return (
@@ -43,6 +44,15 @@ function ProfileContent() {
     location: userProfile?.location || "",
     linkedinUrl: userProfile?.linkedinUrl || "",
   })
+
+  // Calculate user streak using utility function
+  const userStreak = userProfile?.createdAt 
+    ? calculateUserStreak(
+        new Date(userProfile.createdAt), 
+        !!userProfile?.quiz,
+        0 // We don't have completed tasks count in profile context
+      )
+    : 0
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -220,7 +230,7 @@ function ProfileContent() {
                     <p className="text-sm text-muted-foreground">Learning Progress</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-primary">7</p>
+                    <p className="text-2xl font-bold text-primary">{userStreak}</p>
                     <p className="text-sm text-muted-foreground">Day Streak</p>
                   </div>
                   <div className="text-center">
