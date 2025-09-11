@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidEmail(email) {
+      return email is string && 
+             email.size() > 0 && 
+             email.size() < 255 &&
+             email.matches('.*@.*\\..*');
+    }
+    
+    function hasRequiredUserFields() {
+      return request.resource.data.keys().hasAll(['email', 'uid', 'createdAt', 'updatedAt']) &&
+             request.resource.data.email is string &&
+             request.resource.data.uid is string &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Allow users to read their own document
+      allow read: if isOwner(userId);
+      
+      // Allow users to create their own document with required fields
+      allow create: if isOwner(userId) && 
+                      hasRequiredUserFields() &&
+                      request.resource.data.uid == userId &&
+                      isValidEmail(request.resource.data.email);
+      
+      // Allow users to update their own document
+      // Prevent changing uid, email, and createdAt
+      allow update: if isOwner(userId) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.email == resource.data.email &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.updatedAt is timestamp;
+      
+      // Prevent deletion of user documents
+      allow delete: if false;
+    }
+    
+    // Quiz responses collection
+    match /quizResponses/{responseId} {
+      // Allow authenticated users to read their own quiz responses
+      allow read: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Allow authenticated users to create quiz responses
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.answers is map &&
+                      request.resource.data.completedAt is timestamp;
+      
+      // Allow users to update their own quiz responses
+      allow update: if isAuthenticated() && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == resource.data.userId;
+      
+      // Prevent deletion of quiz responses
+      allow delete: if false;
+    }
+    
+    // Career matches collection
+    match /careerMatches/{matchId} {
+      // Allow users to read their own career matches
+      allow read: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Only allow creation through Cloud Functions/Admin SDK
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // Learning paths collection
+    match /learningPaths/{pathId} {
+      // Allow authenticated users to read learning paths
+      allow read: if isAuthenticated();
+      
+      // Only allow creation/updates through Admin SDK
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // User progress collection
+    match /userProgress/{progressId} {
+      // Allow users to read their own progress
+      allow read: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Allow users to create their own progress records
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid;
+      
+      // Allow users to update their own progress
+      allow update: if isAuthenticated() && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == resource.data.userId;
+      
+      // Prevent deletion of progress records
+      allow delete: if false;
+    }
+    
+    // Coach conversations collection
+    match /coachConversations/{conversationId} {
+      // Allow users to read their own conversations
+      allow read: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Allow users to create conversations
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.messages is list;
+      
+      // Allow users to update their own conversations (add messages)
+      allow update: if isAuthenticated() && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.messages is list;
+      
+      // Prevent deletion of conversations
+      allow delete: if false;
+    }
+    
+    // Careers collection (read-only reference data)
+    match /careers/{careerId} {
+      // Allow all authenticated users to read career information
+      allow read: if isAuthenticated();
+      
+      // Only allow Admin SDK to modify
+      allow create, update, delete: if false;
+    }
+    
+    // Learning tasks collection (read-only reference data)
+    match /learningTasks/{taskId} {
+      // Allow all authenticated users to read learning tasks
+      allow read: if isAuthenticated();
+      
+      // Only allow Admin SDK to modify
+      allow create, update, delete: if false;
+    }
+    
+    // Default rule: Deny all access to other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
