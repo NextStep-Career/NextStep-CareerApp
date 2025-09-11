@@ -9,7 +9,9 @@ import {
   signOut,
   signInWithPopup,
   GoogleAuthProvider,
-  updateProfile
+  updateProfile,
+  sendEmailVerification,
+  reload
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase.client'
@@ -25,6 +27,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   logout: () => Promise<void>
   refreshUserProfile: () => Promise<void>
+  sendVerificationEmail: () => Promise<void>
+  checkEmailVerified: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -36,6 +40,8 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
   logout: async () => {},
   refreshUserProfile: async () => {},
+  sendVerificationEmail: async () => {},
+  checkEmailVerified: async () => false,
 })
 
 export function useAuth() {
@@ -54,6 +60,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [userProfile, setUserProfile] = useState<UserDoc | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isSigningUp, setIsSigningUp] = useState(false)
   const router = useRouter()
 
   // Fetch user profile from Firestore
@@ -76,6 +83,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userRef = doc(db, 'users', user.uid)
       const newUserProfile: UserDoc = {
         id: user.uid,
+        uid: user.uid, // Add uid field required by security rules
         name: user.displayName || additionalData?.name || '',
         email: user.email!,
         createdAt: new Date(),
@@ -98,19 +106,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Sign up with email and password
   const signUp = async (email: string, password: string, name: string) => {
     try {
+      setIsSigningUp(true)
       const { user } = await createUserWithEmailAndPassword(auth, email, password)
       
       // Update display name
       await updateProfile(user, { displayName: name })
       
+      // Send email verification
+      await sendEmailVerification(user)
+      
       // Create user profile in Firestore
       await createUserProfile(user, { name: name })
       
-      // Redirect to quiz
-      router.push('/quiz')
+      // Redirect to email verification page
+      router.push('/verify-email')
     } catch (error: any) {
       console.error('Sign up error:', error)
       throw error
+    } finally {
+      setIsSigningUp(false)
     }
   }
 
@@ -118,6 +132,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signIn = async (email: string, password: string) => {
     try {
       const { user } = await signInWithEmailAndPassword(auth, email, password)
+      
+      // Check if email is verified
+      if (!user.emailVerified) {
+        router.push('/verify-email')
+        return
+      }
       
       // Check if user profile exists
       const profileExists = await fetchUserProfile(user.uid)
@@ -171,6 +191,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Send verification email
+  const sendVerificationEmail = async () => {
+    if (user && !user.emailVerified) {
+      try {
+        await sendEmailVerification(user)
+      } catch (error: any) {
+        console.error('Error sending verification email:', error)
+        throw error
+      }
+    }
+  }
+
+  // Check if email is verified
+  const checkEmailVerified = async (): Promise<boolean> => {
+    if (user) {
+      try {
+        await reload(user)
+        return user.emailVerified
+      } catch (error: any) {
+        console.error('Error checking email verification:', error)
+        return false
+      }
+    }
+    return false
+  }
+
   // Refresh user profile
   const refreshUserProfile = async () => {
     if (user) {
@@ -186,6 +232,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (user) {
         // Fetch user profile
         await fetchUserProfile(user.uid)
+        
+        // Don't auto-redirect during signup flow
+        if (!isSigningUp) {
+          // Only auto-redirect for existing users on page refresh/reload
+          const currentPath = window.location.pathname
+          if (currentPath === '/' || currentPath === '/login' || currentPath === '/signup') {
+            if (!user.emailVerified) {
+              router.push('/verify-email')
+            } else {
+              router.push('/dashboard')
+            }
+          }
+        }
       } else {
         setUserProfile(null)
       }
@@ -194,7 +253,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [isSigningUp, router])
 
   const value = {
     user,
@@ -205,6 +264,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signInWithGoogle,
     logout,
     refreshUserProfile,
+    sendVerificationEmail,
+    checkEmailVerified,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -38,6 +38,7 @@ export default function DashboardPage() {
 function DashboardContent() {
   const { userProfile } = useAuth()
   const [userData, setUserData] = useState<any>(null)
+  const [learningData, setLearningData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   // Use mock data for now
@@ -49,8 +50,12 @@ function DashboardContent() {
     async function fetchUserData() {
       if (hasCompletedQuiz) {
         try {
-          const data = await api.user.getData()
-          setUserData(data)
+          const [userData, learningProgress] = await Promise.all([
+            api.user.getData(),
+            api.learning.getProgress()
+          ])
+          setUserData(userData)
+          setLearningData(learningProgress)
         } catch (error) {
           console.error('Failed to fetch user data:', error)
         }
@@ -102,16 +107,12 @@ function DashboardContent() {
   const topCareerId = topCareerMatch?.careerId || 'software-developer'
   const topCareerName = topCareerMatch?.career?.title || topCareerMatch?.career?.name || 'Software Developer'
   
-  const learningTasks = [
-    { title: 'Complete JavaScript Fundamentals Course', progress: 75, completed: false },
-    { title: 'Build Your First React App', progress: 100, completed: true },
-    { title: 'Learn Git Version Control', progress: 45, completed: false },
-    { title: 'Practice Algorithm Problems', progress: 30, completed: false },
-  ]
-  const stats = {
-    totalTasks: 4,
-    completedTasks: 1,
-    overallProgress: 62,
+  // Use real learning data or fallback to empty arrays
+  const learningTasks = learningData?.tasks?.slice(0, 4) || []
+  const stats = learningData?.stats || {
+    totalTasks: 0,
+    completedTasks: 0,
+    overallProgress: 0,
   }
 
   // Map career data to display format
@@ -159,7 +160,9 @@ function DashboardContent() {
                 AI Coach
               </Link>
             </Button>
-            <Button variant="outline">Profile</Button>
+            <Button variant="outline" asChild>
+              <Link href="/profile">Profile</Link>
+            </Button>
           </div>
           <MobileNav isLoggedIn={true} />
         </div>
@@ -398,29 +401,34 @@ function DashboardContent() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {learningTasks.map((task, index) => (
-                    <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          task.completed ? "bg-green-500" : "bg-muted"
-                        }`}
-                      >
-                        {task.completed && <CheckCircle2 className="w-4 h-4 text-white" />}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium">{task.title}</h4>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <Progress value={task.progress} className="flex-1 h-2" />
-                          <span className="text-sm text-muted-foreground">{task.progress}%</span>
+                  {learningTasks.map((task, index) => {
+                    const isCompleted = task.progress?.completed || false
+                    const progressValue = task.progress?.progress || 0
+                    
+                    return (
+                      <div key={task.id || index} className="flex items-center space-x-4 p-4 border rounded-lg">
+                        <div
+                          className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            isCompleted ? "bg-green-500" : "bg-muted"
+                          }`}
+                        >
+                          {isCompleted && <CheckCircle2 className="w-4 h-4 text-white" />}
                         </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium">{task.title}</h4>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Progress value={progressValue} className="flex-1 h-2" />
+                            <span className="text-sm text-muted-foreground">{progressValue}%</span>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/learning?career=${topCareerId}`}>
+                            {isCompleted ? "Review" : "Continue"}
+                          </Link>
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/learning?career=${topCareerId}`}>
-                          {task.completed ? "Review" : "Continue"}
-                        </Link>
-                      </Button>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -437,24 +445,22 @@ function DashboardContent() {
                     <div>
                       <div className="flex justify-between mb-2">
                         <span className="font-medium">Overall Progress</span>
-                        <span className="text-sm text-muted-foreground">62%</span>
+                        <span className="text-sm text-muted-foreground">{stats.overallProgress}%</span>
                       </div>
-                      <Progress value={62} className="h-3" />
+                      <Progress value={stats.overallProgress} className="h-3" />
                     </div>
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="font-medium">JavaScript Skills</span>
-                        <span className="text-sm text-muted-foreground">75%</span>
-                      </div>
-                      <Progress value={75} className="h-3" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <span className="font-medium">React Development</span>
-                        <span className="text-sm text-muted-foreground">45%</span>
-                      </div>
-                      <Progress value={45} className="h-3" />
-                    </div>
+                    {learningTasks.slice(0, 3).map((task, index) => {
+                      const progressValue = task.progress?.progress || 0
+                      return (
+                        <div key={task.id || index}>
+                          <div className="flex justify-between mb-2">
+                            <span className="font-medium">{task.title}</span>
+                            <span className="text-sm text-muted-foreground">{progressValue}%</span>
+                          </div>
+                          <Progress value={progressValue} className="h-3" />
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -465,22 +471,52 @@ function DashboardContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      <span className="line-through text-muted-foreground">Complete 2 coding challenges</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      <span className="line-through text-muted-foreground">Watch 3 tutorial videos</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-5 h-5 border-2 border-muted rounded-full" />
-                      <span>Build a small project</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-5 h-5 border-2 border-muted rounded-full" />
-                      <span>Chat with AI career coach</span>
-                    </div>
+                    {(() => {
+                      const goals = []
+                      const completedTasksCount = stats.completedTasks
+                      const totalTasksCount = stats.totalTasks
+                      
+                      // Goal 1: Complete at least 1 learning task
+                      const hasCompletedTask = completedTasksCount >= 1
+                      goals.push({
+                        completed: hasCompletedTask,
+                        text: 'Complete your first learning task'
+                      })
+                      
+                      // Goal 2: Take personality quiz (if not done)
+                      const hasQuiz = hasCompletedQuiz
+                      goals.push({
+                        completed: hasQuiz,
+                        text: 'Complete personality assessment'
+                      })
+                      
+                      // Goal 3: Explore career matches
+                      const hasCareerMatches = careerMatches.length > 0
+                      goals.push({
+                        completed: hasCareerMatches,
+                        text: 'Discover your career matches'
+                      })
+                      
+                      // Goal 4: Make progress on learning path
+                      const hasProgress = stats.overallProgress > 0
+                      goals.push({
+                        completed: hasProgress,
+                        text: 'Start your learning journey'
+                      })
+                      
+                      return goals.map((goal, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          {goal.completed ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <div className="w-5 h-5 border-2 border-muted rounded-full" />
+                          )}
+                          <span className={goal.completed ? 'line-through text-muted-foreground' : ''}>
+                            {goal.text}
+                          </span>
+                        </div>
+                      ))
+                    })()}
                   </div>
                 </CardContent>
               </Card>

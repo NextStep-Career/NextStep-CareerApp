@@ -2,6 +2,7 @@
 
 export interface UserDoc {
   id: string
+  uid: string // Firebase Auth UID, required by security rules
   name: string
   email: string
   createdAt: Date

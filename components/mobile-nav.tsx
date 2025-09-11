@@ -123,8 +123,10 @@ export function MobileNav({ isLoggedIn = false }: MobileNavProps) {
                 Learning Paths
               </Link>
               <div className="pt-4">
-                <Button variant="outline" className="w-full">
-                  Profile
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href="/profile" onClick={handleLinkClick}>
+                    Profile
+                  </Link>
                 </Button>
               </div>
             </>
